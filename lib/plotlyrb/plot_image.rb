@@ -6,28 +6,29 @@ module Plotlyrb
 
     VALID_IMAGE_FORMATS = [:png, :svg, :pdf, :eps]
 
+    SpecPath = Struct.new(:spec, :path)
+
     def initialize(headers)
       @headers = headers
       @https = Net::HTTP.new(ApiV2::IMAGES.host, ApiV2::IMAGES.port)
       @https.use_ssl = true
     end
 
-    def plot_image(plot_image_spec, image_path)
-      raise 'No :format key in spec' unless plot_image_spec.has_key?(:format)
-      raise 'No :figure key in spec' unless plot_image_spec.has_key?(:figure)
-      raise ':data key not found at {:figure => {:data => ...}}' unless plot_image_spec[:figure].has_key?(:data)
+    def plot_image(spec_path)
+      raise 'No :format key in spec' unless spec_path.spec.has_key?(:format)
+      raise 'No :figure key in spec' unless spec_path.spec.has_key?(:figure)
+      raise ':data key not found at {:figure => {:data => ...}}' unless spec_path.spec[:figure].has_key?(:data)
 
-      image_format = plot_image_spec[:format]
+      image_format = spec_path.spec[:format]
       raise "Image format #{image_format} not supported" unless VALID_IMAGE_FORMATS.include?(image_format.to_sym)
 
       request = Net::HTTP::Post.new(ApiV2::IMAGES.path, @headers)
-      request.body = plot_image_spec.to_json
+      request.body = spec_path.spec.to_json
       response = Response.from_http_response(@https.request(request))
-      IO.binwrite(image_path, response.body) if response.success
+      IO.binwrite(spec_path.path, response.body) if response.success
       response
     end
 
-    SpecPath = Struct.new(:spec, :path)
     AsyncJobResult = Struct.new(:success, :message, :spec_path)
 
     class AsyncJob < Struct.new(:thread, :spec_path, :start_time, :timeout)
